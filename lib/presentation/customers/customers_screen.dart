@@ -16,24 +16,25 @@ class CustomersScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final customers = ref.watch(customersProvider);
     final favoritesOnly = ref.watch(favoritesOnlyProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => const _CustomerFormSheet(),
-        ),
-        icon: const Icon(Icons.add_business_rounded),
-        label: const Text('New customer'),
-      ),
-      body: CustomScrollView(
+    return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 96),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const SectionHeader(title: 'Customers', subtitle: 'Profiles, history, attachments, and segments'),
+                SectionHeader(
+                  title: 'Customers',
+                  subtitle: 'Profiles, history, attachments, and segments',
+                  action: HeaderActionButton(
+                    label: 'New',
+                    icon: Icons.add_business_rounded,
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => const _CustomerFormSheet(),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 CrmSearchField(
                   hint: 'Search customers or companies',
@@ -56,7 +57,6 @@ class CustomersScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
     );
   }
 }
@@ -91,7 +91,7 @@ class _CustomerCard extends ConsumerWidget {
                   onPressed: () => ref.read(customersControllerProvider.notifier).toggleFavorite(customer),
                   icon: Icon(customer.isFavorite ? Icons.star_rounded : Icons.star_border_rounded, color: AppColors.amber),
                 ),
-                PopupMenuButton<String>(
+                CrmMenuButton<String>(
                   onSelected: (value) async {
                     final controller = ref.read(customersControllerProvider.notifier);
                     if (value == 'edit') {
@@ -109,7 +109,7 @@ class _CustomerCard extends ConsumerWidget {
                     }
                     if (value == 'delete') await controller.deleteCustomer(customer.id);
                   },
-                  itemBuilder: (context) => const [
+                  items: const [
                     PopupMenuItem(value: 'edit', child: Text('Edit customer')),
                     PopupMenuItem(value: 'note', child: Text('Add timeline note')),
                     PopupMenuItem(value: 'delete', child: Text('Delete customer')),

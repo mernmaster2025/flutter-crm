@@ -24,26 +24,65 @@ class MoreScreen extends StatelessWidget {
       _MoreItem('Settings', 'Profile, theme, security, preferences', Icons.settings_rounded, '/settings'),
       _MoreItem('Admin', 'Users, teams, permissions, monitoring', Icons.admin_panel_settings_rounded, '/admin'),
     ];
+    final columns = MediaQuery.sizeOf(context).width >= 700 ? 2 : 1;
     return ListView(
       padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 96),
       children: [
         const SectionHeader(title: 'CRM workspace', subtitle: 'Manage your revenue operations modules'),
         const SizedBox(height: AppSpacing.lg),
-        for (final item in items)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: GlassPanel(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(child: Icon(item.icon)),
-                title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w900)),
-                subtitle: Text(item.subtitle),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => context.go(item.path),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisSpacing: AppSpacing.sm,
+            childAspectRatio: columns == 1 ? 2.6 : 2.9,
+          ),
+          itemBuilder: (context, index) => _MoreModuleCard(item: items[index]),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoreModuleCard extends StatelessWidget {
+  const _MoreModuleCard({required this.item});
+
+  final _MoreItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      onTap: () => context.go(item.path),
+      child: GlassPanel(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Row(
+          children: [
+            CircleAvatar(child: Icon(item.icon)),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: AppSpacing.xxs),
+                  Text(
+                    item.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
-          ),
-      ],
+            const Icon(Icons.arrow_forward_rounded, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -370,6 +409,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeControllerProvider);
+    final user = ref.watch(authControllerProvider).valueOrNull;
     return _ModulePage(
       title: 'Settings',
       subtitle: 'Profile, team, theme, security, and notifications',
@@ -398,10 +438,93 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppSpacing.md),
           GlassPanel(
             child: Column(
-              children: const [
-                ListTile(leading: Icon(Icons.security_rounded), title: Text('Security settings'), subtitle: Text('Biometric login, session management, and device trust')),
-                ListTile(leading: Icon(Icons.group_rounded), title: Text('Team management'), subtitle: Text('Roles, permissions, and workspace membership')),
-                ListTile(leading: Icon(Icons.tune_rounded), title: Text('App preferences'), subtitle: Text('Pipeline stages, notifications, and CRM defaults')),
+              children: [
+                SectionHeader(
+                  title: 'Workspace profile',
+                  subtitle: '${user?.name ?? 'Apex User'} • ${user?.team ?? 'Sales'} team',
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                _SettingsActionTile(
+                  icon: Icons.person_rounded,
+                  title: 'Edit user profile',
+                  subtitle: 'Name, role, avatar, and contact preferences',
+                  onTap: () => context.go('/profile'),
+                ),
+                _SettingsActionTile(
+                  icon: Icons.cloud_done_rounded,
+                  title: 'Create local backup checkpoint',
+                  subtitle: 'Save an offline sync checkpoint for this device',
+                  onTap: () => _saveLocalAction(context, ref, 'Backup checkpoint', 'Local CRM checkpoint saved.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          GlassPanel(
+            child: Column(
+              children: [
+                const SectionHeader(title: 'Security', subtitle: 'Session management and device trust'),
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.fingerprint_rounded),
+                  title: const Text('Require biometric unlock'),
+                  subtitle: const Text('Use device biometrics before opening sensitive CRM data'),
+                  value: true,
+                  onChanged: (_) => _saveLocalAction(context, ref, 'Security preference', 'Biometric unlock preference saved locally.'),
+                ),
+                _SettingsActionTile(
+                  icon: Icons.lock_clock_rounded,
+                  title: 'Reset trusted session',
+                  subtitle: 'Clear local trust and require a fresh sign-in',
+                  onTap: () => _saveLocalAction(context, ref, 'Trusted session reset', 'This device trust state was refreshed locally.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          GlassPanel(
+            child: Column(
+              children: [
+                const SectionHeader(title: 'Notifications', subtitle: 'Follow-up, task, and meeting reminders'),
+                const SizedBox(height: AppSpacing.sm),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.notifications_active_rounded),
+                  title: const Text('Follow-up reminders'),
+                  subtitle: const Text('Create local alerts for due leads and tasks'),
+                  value: true,
+                  onChanged: (_) => _saveLocalAction(context, ref, 'Notification preference', 'Follow-up reminders preference saved.'),
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  secondary: const Icon(Icons.video_camera_front_rounded),
+                  title: const Text('Meeting alerts'),
+                  subtitle: const Text('Notify before customer meetings'),
+                  value: true,
+                  onChanged: (_) => _saveLocalAction(context, ref, 'Meeting alerts', 'Meeting alert preference saved.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          GlassPanel(
+            child: Column(
+              children: [
+                const SectionHeader(title: 'CRM preferences', subtitle: 'Default stages, layout density, and lead ownership'),
+                const SizedBox(height: AppSpacing.sm),
+                _SettingsActionTile(
+                  icon: Icons.view_kanban_rounded,
+                  title: 'Customize pipeline stages',
+                  subtitle: 'Configure discovery, proposal, won/lost flow locally',
+                  onTap: () => _saveLocalAction(context, ref, 'Pipeline configuration', 'Pipeline stage preferences saved locally.'),
+                ),
+                _SettingsActionTile(
+                  icon: Icons.density_medium_rounded,
+                  title: 'Use compact business cards',
+                  subtitle: 'Reduce spacing for lead and customer lists',
+                  onTap: () => _saveLocalAction(context, ref, 'Layout preference', 'Compact card preference saved locally.'),
+                ),
               ],
             ),
           ),
@@ -416,43 +539,165 @@ class AdminScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = [
-      ('User management', 'Invite, deactivate, and audit users', Icons.manage_accounts_rounded),
-      ('Team management', 'Territories, sales pods, and capacity', Icons.groups_2_rounded),
-      ('Permission control', 'Admin, manager, sales, and support roles', Icons.verified_user_rounded),
-      ('CRM configuration', 'Custom stages, fields, lead sources', Icons.schema_rounded),
-      ('Activity monitoring', 'Workspace activity and compliance events', Icons.monitor_heart_rounded),
-    ];
+    final dashboard = ref.watch(dashboardProvider);
     return _ModulePage(
       title: 'Admin',
       subtitle: 'Control workspace access, CRM configuration, and operations',
       child: Column(
         children: [
-          for (final item in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: GlassPanel(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(child: Icon(item.$3)),
-                  title: Text(item.$1, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text(item.$2),
-                  trailing: const Icon(Icons.chevron_right_rounded),
-                  onTap: () async {
-                    await ref.read(notificationsControllerProvider.notifier).createReminder(
-                          '${item.$1} updated',
-                          '${item.$2} was saved locally for admin review.',
-                        );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${item.$1} action saved locally')),
-                      );
-                    }
-                  },
-                ),
+          dashboard.when(
+            loading: () => const LoadingSkeleton(rows: 1),
+            error: (error, stackTrace) => EmptyState(title: 'Admin analytics unavailable', message: '$error'),
+            data: (bundle) => GlassPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SectionHeader(title: 'Admin analytics', subtitle: 'Live local workspace overview'),
+                  const SizedBox(height: AppSpacing.md),
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      StatusBadge(label: '${bundle.metrics.activeCustomers} customers', color: AppColors.indigo),
+                      StatusBadge(label: '${bundle.metrics.totalLeads} leads', color: AppColors.azure),
+                      StatusBadge(label: '${bundle.metrics.upcomingMeetings} meetings', color: AppColors.emerald),
+                    ],
+                  ),
+                ],
               ),
             ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _AdminActionCard(
+            icon: Icons.manage_accounts_rounded,
+            title: 'User management',
+            subtitle: 'Invite users, deactivate seats, and audit account access',
+            primaryAction: 'Invite user',
+            secondaryAction: 'Audit users',
+            onPrimary: () => _saveLocalAction(context, ref, 'User invited', 'A local user invitation record was created.'),
+            onSecondary: () => _saveLocalAction(context, ref, 'User audit', 'User access audit queued locally.'),
+          ),
+          _AdminActionCard(
+            icon: Icons.groups_2_rounded,
+            title: 'Team management',
+            subtitle: 'Manage sales pods, territories, and capacity',
+            primaryAction: 'Create team',
+            secondaryAction: 'Assign territory',
+            onPrimary: () => _saveLocalAction(context, ref, 'Team created', 'A local team setup record was created.'),
+            onSecondary: () => _saveLocalAction(context, ref, 'Territory assigned', 'Territory assignment saved locally.'),
+          ),
+          _AdminActionCard(
+            icon: Icons.verified_user_rounded,
+            title: 'Roles & permissions',
+            subtitle: 'Configure admin, manager, sales, and support access',
+            primaryAction: 'Edit roles',
+            secondaryAction: 'Review policy',
+            onPrimary: () => _saveLocalAction(context, ref, 'Roles updated', 'Role configuration saved locally.'),
+            onSecondary: () => _saveLocalAction(context, ref, 'Policy review', 'Permission policy review queued locally.'),
+          ),
+          _AdminActionCard(
+            icon: Icons.schema_rounded,
+            title: 'CRM configuration',
+            subtitle: 'Custom stages, fields, lead sources, and automation defaults',
+            primaryAction: 'Configure CRM',
+            secondaryAction: 'Reset defaults',
+            onPrimary: () => _saveLocalAction(context, ref, 'CRM configured', 'CRM configuration saved locally.'),
+            onSecondary: () => _saveLocalAction(context, ref, 'Defaults restored', 'Default CRM configuration restored locally.'),
+          ),
+          _AdminActionCard(
+            icon: Icons.monitor_heart_rounded,
+            title: 'Activity monitoring',
+            subtitle: 'Review workspace activity and compliance events',
+            primaryAction: 'View activity',
+            secondaryAction: 'Export audit',
+            onPrimary: () => context.go('/activities'),
+            onSecondary: () => ref.read(exportsControllerProvider.notifier).generateExport('Admin Audit', ExportFormat.pdf),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsActionTile extends StatelessWidget {
+  const _SettingsActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(child: Icon(icon)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+class _AdminActionCard extends StatelessWidget {
+  const _AdminActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.primaryAction,
+    required this.secondaryAction,
+    required this.onPrimary,
+    required this.onSecondary,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String primaryAction;
+  final String secondaryAction;
+  final VoidCallback onPrimary;
+  final VoidCallback onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: GlassPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(child: Icon(icon)),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                FilledButton.tonal(onPressed: onPrimary, child: Text(primaryAction)),
+                OutlinedButton(onPressed: onSecondary, child: Text(secondaryAction)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -625,4 +870,16 @@ Future<String?> _promptText(BuildContext context, String title, String label) {
       ],
     ),
   );
+}
+
+Future<void> _saveLocalAction(
+  BuildContext context,
+  WidgetRef ref,
+  String title,
+  String body,
+) async {
+  await ref.read(notificationsControllerProvider.notifier).createReminder(title, body);
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(body)));
+  }
 }

@@ -14,24 +14,25 @@ class LeadsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leads = ref.watch(leadsControllerProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => const _LeadFormSheet(),
-        ),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('New lead'),
-      ),
-      body: CustomScrollView(
+    return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 96),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                const SectionHeader(title: 'Leads', subtitle: 'Track, qualify, and schedule follow-ups'),
+                SectionHeader(
+                  title: 'Leads',
+                  subtitle: 'Track, qualify, and schedule follow-ups',
+                  action: HeaderActionButton(
+                    label: 'New',
+                    icon: Icons.add_rounded,
+                    onPressed: () => showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => const _LeadFormSheet(),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 CrmSearchField(
                   hint: 'Search leads, companies, email',
@@ -51,7 +52,6 @@ class LeadsScreen extends ConsumerWidget {
             ),
           ),
         ],
-      ),
     );
   }
 }
@@ -114,7 +114,7 @@ class _LeadTile extends ConsumerWidget {
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
+                CrmMenuButton<String>(
                   onSelected: (value) async {
                     final controller = ref.read(leadsControllerProvider.notifier);
                     if (value == 'edit') {
@@ -133,7 +133,7 @@ class _LeadTile extends ConsumerWidget {
                     if (value == 'converted') await controller.updateStatus(lead, LeadStatus.converted);
                     if (value == 'delete') await controller.deleteLead(lead.id);
                   },
-                  itemBuilder: (context) => const [
+                  items: const [
                     PopupMenuItem(value: 'edit', child: Text('Edit lead')),
                     PopupMenuItem(value: 'note', child: Text('Add note')),
                     PopupMenuItem(value: 'converted', child: Text('Mark converted')),

@@ -102,7 +102,7 @@ class _MetricGrid extends StatelessWidget {
         crossAxisCount: Breakpoints.dashboardColumns(context),
         crossAxisSpacing: AppSpacing.sm,
         mainAxisSpacing: AppSpacing.sm,
-        childAspectRatio: Breakpoints.isTabletOrLarger(context) ? 1.6 : 1.08,
+        childAspectRatio: Breakpoints.isTabletOrLarger(context) ? 1.45 : 0.98,
       ),
       itemBuilder: (context, index) => cards[index].animate().fadeIn(delay: (40 * index).ms).slideY(begin: 0.08),
     );

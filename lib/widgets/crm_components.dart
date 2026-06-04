@@ -62,13 +62,15 @@ class MetricCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return GlassPanel(
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                   color: accent.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
@@ -80,12 +82,82 @@ class MetricCard extends StatelessWidget {
                 Text(delta!, style: TextStyle(color: AppColors.emerald, fontWeight: FontWeight.w800)),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(title, style: TextStyle(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+          const SizedBox(height: AppSpacing.xs),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+          ),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class HeaderActionButton extends StatelessWidget {
+  const HeaderActionButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 42),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+    );
+  }
+}
+
+class CrmMenuButton<T> extends StatelessWidget {
+  const CrmMenuButton({
+    super.key,
+    required this.items,
+    required this.onSelected,
+  });
+
+  final List<PopupMenuEntry<T>> items;
+  final PopupMenuItemSelected<T> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopupMenuButton<T>(
+      onSelected: onSelected,
+      color: scheme.surface,
+      elevation: 8,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+      icon: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(AppSpacing.xs),
+          child: Icon(Icons.more_horiz_rounded, size: 20),
+        ),
+      ),
+      itemBuilder: (context) => items,
     );
   }
 }

@@ -15,23 +15,24 @@ class PipelineScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final deals = ref.watch(dealsControllerProvider);
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showModalBottomSheet<void>(
-          context: context,
-          isScrollControlled: true,
-          builder: (_) => const _DealFormSheet(),
-        ),
-        icon: const Icon(Icons.add_chart_rounded),
-        label: const Text('New deal'),
-      ),
-      body: Padding(
+    return Padding(
         padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 96),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(title: 'Sales pipeline', subtitle: 'Drag deals between stages and track weighted forecast'),
+            SectionHeader(
+              title: 'Sales pipeline',
+              subtitle: 'Drag deals between stages and track weighted forecast',
+              action: HeaderActionButton(
+                label: 'New',
+                icon: Icons.add_chart_rounded,
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => const _DealFormSheet(),
+                ),
+              ),
+            ),
             const SizedBox(height: AppSpacing.lg),
             Expanded(
               child: deals.when(
@@ -54,7 +55,6 @@ class PipelineScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -149,7 +149,7 @@ class _DealCard extends ConsumerWidget {
             Row(
               children: [
                 Expanded(child: Text(deal.title, style: const TextStyle(fontWeight: FontWeight.w900))),
-                PopupMenuButton<String>(
+                CrmMenuButton<String>(
                   onSelected: (value) async {
                     final controller = ref.read(dealsControllerProvider.notifier);
                     if (value == 'edit') {
@@ -163,7 +163,7 @@ class _DealCard extends ConsumerWidget {
                     if (value == 'lost') await controller.saveDeal(deal.copyWith(stage: DealStage.lost, probability: 0));
                     if (value == 'delete') await controller.deleteDeal(deal.id);
                   },
-                  itemBuilder: (context) => const [
+                  items: const [
                     PopupMenuItem(value: 'edit', child: Text('Edit deal')),
                     PopupMenuItem(value: 'won', child: Text('Mark won')),
                     PopupMenuItem(value: 'lost', child: Text('Mark lost')),
