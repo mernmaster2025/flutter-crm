@@ -53,7 +53,7 @@ class GlassPanel extends StatelessWidget {
   const GlassPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpacing.md),
+    this.padding = const EdgeInsets.all(AppSpacing.sm),
     this.borderRadius = AppSpacing.radiusLg,
   });
 

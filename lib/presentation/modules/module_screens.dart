@@ -38,7 +38,7 @@ class MoreScreen extends StatelessWidget {
             crossAxisCount: columns,
             crossAxisSpacing: AppSpacing.sm,
             mainAxisSpacing: AppSpacing.sm,
-            childAspectRatio: columns == 1 ? 2.6 : 2.9,
+            childAspectRatio: columns == 1 ? 3.45 : 3.2,
           ),
           itemBuilder: (context, index) => _MoreModuleCard(item: items[index]),
         ),
@@ -58,10 +58,10 @@ class _MoreModuleCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
       onTap: () => context.go(item.path),
       child: GlassPanel(
-        padding: const EdgeInsets.all(AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         child: Row(
           children: [
-            CircleAvatar(child: Icon(item.icon)),
+            CircleAvatar(radius: 20, child: Icon(item.icon, size: 20)),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(

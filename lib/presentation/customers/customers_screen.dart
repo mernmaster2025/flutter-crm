@@ -117,7 +117,7 @@ class _CustomerCard extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.xs,
               children: [
@@ -126,10 +126,10 @@ class _CustomerCard extends ConsumerWidget {
                 for (final tag in customer.tags) StatusBadge(label: tag, color: AppColors.azure),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Text('Activity timeline', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: AppSpacing.xs),
-            for (final item in customer.history)
+            for (final item in customer.history.take(2))
               Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                 child: Row(

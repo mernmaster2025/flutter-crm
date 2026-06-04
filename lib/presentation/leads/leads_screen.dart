@@ -142,7 +142,7 @@ class _LeadTile extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Wrap(
               spacing: AppSpacing.xs,
               runSpacing: AppSpacing.xs,
@@ -153,7 +153,7 @@ class _LeadTile extends ConsumerWidget {
                 StatusBadge(label: compactMoney(lead.estimatedValue)),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             Text('Next follow-up: ${lead.nextFollowUp.month}/${lead.nextFollowUp.day} • ${lead.assignedTo}'),
             if (lead.notes.isNotEmpty) Text(lead.notes.first, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],

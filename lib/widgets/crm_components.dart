@@ -64,7 +64,7 @@ class MetricCard extends StatelessWidget {
     return GlassPanel(
       padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -88,6 +88,7 @@ class MetricCard extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
           ),
+          const SizedBox(height: AppSpacing.xxs),
           Text(
             title,
             maxLines: 1,
