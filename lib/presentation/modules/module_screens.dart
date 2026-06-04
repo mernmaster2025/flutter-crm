@@ -226,24 +226,20 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           GlassPanel(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                RadioListTile<ThemeMode>(
-                  title: const Text('System theme'),
-                  value: ThemeMode.system,
-                  groupValue: mode,
-                  onChanged: (value) => ref.read(themeModeControllerProvider.notifier).setThemeMode(value!),
-                ),
-                RadioListTile<ThemeMode>(
-                  title: const Text('Light mode'),
-                  value: ThemeMode.light,
-                  groupValue: mode,
-                  onChanged: (value) => ref.read(themeModeControllerProvider.notifier).setThemeMode(value!),
-                ),
-                RadioListTile<ThemeMode>(
-                  title: const Text('Dark mode'),
-                  value: ThemeMode.dark,
-                  groupValue: mode,
-                  onChanged: (value) => ref.read(themeModeControllerProvider.notifier).setThemeMode(value!),
+                Text('Theme mode', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: AppSpacing.sm),
+                SegmentedButton<ThemeMode>(
+                  selected: {mode},
+                  onSelectionChanged: (selection) {
+                    ref.read(themeModeControllerProvider.notifier).setThemeMode(selection.single);
+                  },
+                  segments: const [
+                    ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.auto_mode_rounded)),
+                    ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode_rounded)),
+                    ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode_rounded)),
+                  ],
                 ),
               ],
             ),
