@@ -115,10 +115,28 @@ class _LeadTile extends ConsumerWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'delete') ref.read(crmUseCasesProvider).removeLead(lead.id).then((_) => ref.invalidate(leadsControllerProvider));
+                  onSelected: (value) async {
+                    final controller = ref.read(leadsControllerProvider.notifier);
+                    if (value == 'edit') {
+                      await showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => _LeadFormSheet(lead: lead),
+                      );
+                    }
+                    if (value == 'note') {
+                      final note = await _promptText(context, 'Add lead note', 'Note');
+                      if (note != null && note.trim().isNotEmpty) {
+                        await controller.addNote(lead, note.trim());
+                      }
+                    }
+                    if (value == 'converted') await controller.updateStatus(lead, LeadStatus.converted);
+                    if (value == 'delete') await controller.deleteLead(lead.id);
                   },
                   itemBuilder: (context) => const [
+                    PopupMenuItem(value: 'edit', child: Text('Edit lead')),
+                    PopupMenuItem(value: 'note', child: Text('Add note')),
+                    PopupMenuItem(value: 'converted', child: Text('Mark converted')),
                     PopupMenuItem(value: 'delete', child: Text('Delete lead')),
                   ],
                 ),
@@ -146,7 +164,9 @@ class _LeadTile extends ConsumerWidget {
 }
 
 class _LeadFormSheet extends ConsumerStatefulWidget {
-  const _LeadFormSheet();
+  const _LeadFormSheet({this.lead});
+
+  final Lead? lead;
 
   @override
   ConsumerState<_LeadFormSheet> createState() => _LeadFormSheetState();
@@ -158,6 +178,22 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
   final _company = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  LeadStatus _status = LeadStatus.newLead;
+  PriorityLevel _priority = PriorityLevel.medium;
+
+  @override
+  void initState() {
+    super.initState();
+    final lead = widget.lead;
+    if (lead != null) {
+      _name.text = lead.name;
+      _company.text = lead.company;
+      _email.text = lead.email;
+      _phone.text = lead.phone;
+      _status = lead.status;
+      _priority = lead.priority;
+    }
+  }
 
   @override
   void dispose() {
@@ -171,7 +207,7 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: EdgeInsets.only(
           left: AppSpacing.lg,
           right: AppSpacing.lg,
@@ -183,7 +219,10 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SectionHeader(title: 'Create lead', subtitle: 'Capture contact and company context'),
+              SectionHeader(
+                title: widget.lead == null ? 'Create lead' : 'Edit lead',
+                subtitle: 'Capture contact, status, and priority context',
+              ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Name'), validator: (v) => Validators.required(v, field: 'Name')),
               const SizedBox(height: AppSpacing.sm),
@@ -192,16 +231,52 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
               TextFormField(controller: _email, decoration: const InputDecoration(labelText: 'Email'), validator: Validators.email),
               const SizedBox(height: AppSpacing.sm),
               TextFormField(controller: _phone, decoration: const InputDecoration(labelText: 'Phone'), validator: Validators.phone),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<LeadStatus>(
+                initialValue: _status,
+                decoration: const InputDecoration(labelText: 'Status'),
+                items: [
+                  for (final status in LeadStatus.values)
+                    DropdownMenuItem(value: status, child: Text(status.label)),
+                ],
+                onChanged: (value) => setState(() => _status = value ?? _status),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              DropdownButtonFormField<PriorityLevel>(
+                initialValue: _priority,
+                decoration: const InputDecoration(labelText: 'Priority'),
+                items: [
+                  for (final priority in PriorityLevel.values)
+                    DropdownMenuItem(value: priority, child: Text(priority.label)),
+                ],
+                onChanged: (value) => setState(() => _priority = value ?? _priority),
+              ),
               const SizedBox(height: AppSpacing.lg),
               FilledButton(
                 onPressed: () async {
                   if (!_formKey.currentState!.validate()) return;
-                  await ref.read(leadsControllerProvider.notifier).createDemoLead(
-                        name: _name.text,
-                        company: _company.text,
-                        email: _email.text,
-                        phone: _phone.text,
-                      );
+                  final existing = widget.lead;
+                  if (existing == null) {
+                    await ref.read(leadsControllerProvider.notifier).createDemoLead(
+                          name: _name.text,
+                          company: _company.text,
+                          email: _email.text,
+                          phone: _phone.text,
+                          status: _status,
+                          priority: _priority,
+                        );
+                  } else {
+                    await ref.read(leadsControllerProvider.notifier).saveLead(
+                          existing.copyWith(
+                            name: _name.text,
+                            company: _company.text,
+                            email: _email.text,
+                            phone: _phone.text,
+                            status: _status,
+                            priority: _priority,
+                          ),
+                        );
+                  }
                   if (context.mounted) Navigator.of(context).pop();
                 },
                 child: const Text('Save lead'),
@@ -212,4 +287,23 @@ class _LeadFormSheetState extends ConsumerState<_LeadFormSheet> {
       ),
     );
   }
+}
+
+Future<String?> _promptText(BuildContext context, String title, String label) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: InputDecoration(labelText: label),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
+      ],
+    ),
+  );
 }

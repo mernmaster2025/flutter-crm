@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../data/datasources/crm_local_data_source.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../data/repositories/crm_repository_impl.dart';
 import '../../data/services/local_cache_service.dart';
@@ -19,6 +20,10 @@ import '../../services/session_service.dart';
 
 final localCacheServiceProvider = Provider<LocalCacheService>((ref) {
   throw UnimplementedError('LocalCacheService must be overridden at bootstrap.');
+});
+
+final crmLocalDataSourceProvider = Provider<CrmLocalDataSource>((ref) {
+  throw UnimplementedError('CrmLocalDataSource must be overridden at bootstrap.');
 });
 
 final dioProvider = Provider<Dio>((ref) {
@@ -51,8 +56,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 final crmRepositoryProvider = Provider<CrmRepository>((ref) {
   return CrmRepositoryImpl(
-    api: ref.watch(mockCrmApiProvider),
-    cache: ref.watch(localCacheServiceProvider),
+    localDataSource: ref.watch(crmLocalDataSourceProvider),
   );
 });
 
@@ -156,7 +160,22 @@ class LeadsController extends AsyncNotifier<List<Lead>> {
 
   Future<void> saveLead(Lead lead) async {
     await ref.read(crmUseCasesProvider).upsertLead(lead);
+    ref.invalidate(dashboardProvider);
     ref.invalidateSelf();
+  }
+
+  Future<void> deleteLead(String id) async {
+    await ref.read(crmUseCasesProvider).removeLead(id);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> addNote(Lead lead, String note) {
+    return saveLead(lead.copyWith(notes: [...lead.notes, note]));
+  }
+
+  Future<void> updateStatus(Lead lead, LeadStatus status) {
+    return saveLead(lead.copyWith(status: status));
   }
 
   Future<void> createDemoLead({
@@ -164,6 +183,8 @@ class LeadsController extends AsyncNotifier<List<Lead>> {
     required String company,
     required String email,
     required String phone,
+    LeadStatus status = LeadStatus.newLead,
+    PriorityLevel priority = PriorityLevel.medium,
   }) async {
     final lead = Lead(
       id: const Uuid().v4(),
@@ -172,8 +193,8 @@ class LeadsController extends AsyncNotifier<List<Lead>> {
       email: email,
       phone: phone,
       source: 'Mobile App',
-      status: LeadStatus.newLead,
-      priority: PriorityLevel.medium,
+      status: status,
+      priority: priority,
       assignedTo: 'Maya Chen',
       estimatedValue: 75000,
       createdAt: DateTime.now(),
@@ -187,12 +208,69 @@ class LeadsController extends AsyncNotifier<List<Lead>> {
 final customerQueryProvider = StateProvider<String>((ref) => '');
 final favoritesOnlyProvider = StateProvider<bool>((ref) => false);
 
-final customersProvider = FutureProvider<List<Customer>>((ref) {
-  return ref.watch(crmUseCasesProvider).customers(
-        query: ref.watch(customerQueryProvider),
-        favoritesOnly: ref.watch(favoritesOnlyProvider),
-      );
-});
+final customersControllerProvider = AsyncNotifierProvider<CustomersController, List<Customer>>(
+  CustomersController.new,
+);
+
+final customersProvider = customersControllerProvider;
+
+class CustomersController extends AsyncNotifier<List<Customer>> {
+  @override
+  Future<List<Customer>> build() {
+    return ref.watch(crmUseCasesProvider).customers(
+          query: ref.watch(customerQueryProvider),
+          favoritesOnly: ref.watch(favoritesOnlyProvider),
+        );
+  }
+
+  Future<void> saveCustomer(Customer customer) async {
+    await ref.read(crmUseCasesProvider).upsertCustomer(customer);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteCustomer(String id) async {
+    await ref.read(crmUseCasesProvider).removeCustomer(id);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleFavorite(Customer customer) async {
+    await ref.read(crmUseCasesProvider).toggleFavorite(customer);
+    ref.invalidateSelf();
+  }
+
+  Future<void> addHistory(Customer customer, String note) async {
+    await ref.read(crmUseCasesProvider).addCustomerNote(customer, note);
+    ref.invalidate(activitiesProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createDemoCustomer({
+    required String name,
+    required String company,
+    required String email,
+    required String phone,
+    CustomerSegment segment = CustomerSegment.midMarket,
+  }) {
+    return saveCustomer(
+      Customer(
+        id: const Uuid().v4(),
+        name: name,
+        company: company,
+        email: email,
+        phone: phone,
+        location: 'Remote',
+        segment: segment,
+        owner: 'Maya Chen',
+        revenue: 0,
+        isFavorite: false,
+        tags: const ['New'],
+        history: const ['Created from mobile CRM.'],
+      ),
+    );
+  }
+}
 
 final dealsControllerProvider = AsyncNotifierProvider<DealsController, List<Deal>>(
   DealsController.new,
@@ -205,12 +283,240 @@ class DealsController extends AsyncNotifier<List<Deal>> {
   Future<void> moveDeal(String id, DealStage stage) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => ref.read(crmUseCasesProvider).moveDeal(id, stage));
+    ref.invalidate(dashboardProvider);
+  }
+
+  Future<void> saveDeal(Deal deal) async {
+    await ref.read(crmUseCasesProvider).upsertDeal(deal);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteDeal(String id) async {
+    await ref.read(crmUseCasesProvider).removeDeal(id);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createDemoDeal(String title, String customerName, double value) {
+    return saveDeal(
+      Deal(
+        id: const Uuid().v4(),
+        title: title,
+        customerId: 'manual',
+        customerName: customerName,
+        stage: DealStage.discovery,
+        value: value,
+        probability: 0.35,
+        closeDate: DateTime.now().add(const Duration(days: 30)),
+        owner: 'Maya Chen',
+      ),
+    );
   }
 }
 
-final tasksProvider = FutureProvider<List<TaskItem>>((ref) => ref.watch(crmUseCasesProvider).tasks());
-final meetingsProvider = FutureProvider<List<Meeting>>((ref) => ref.watch(crmUseCasesProvider).meetings());
-final activitiesProvider = FutureProvider<List<ActivityItem>>((ref) => ref.watch(crmUseCasesProvider).activities());
-final notificationsProvider = FutureProvider<List<CrmNotification>>(
-  (ref) => ref.watch(crmUseCasesProvider).notifications(),
+final tasksControllerProvider = AsyncNotifierProvider<TasksController, List<TaskItem>>(
+  TasksController.new,
 );
+
+final tasksProvider = tasksControllerProvider;
+
+class TasksController extends AsyncNotifier<List<TaskItem>> {
+  @override
+  Future<List<TaskItem>> build() => ref.watch(crmUseCasesProvider).tasks();
+
+  Future<void> saveTask(TaskItem task) async {
+    await ref.read(crmUseCasesProvider).upsertTask(task);
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> toggleDone(TaskItem task) {
+    final nextStatus = task.status == TaskStatus.done ? TaskStatus.todo : TaskStatus.done;
+    return saveTask(task.copyWith(status: nextStatus));
+  }
+
+  Future<void> deleteTask(String id) async {
+    await ref.read(crmUseCasesProvider).removeTask(id);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createDemoTask(String title) {
+    return saveTask(
+      TaskItem(
+        id: const Uuid().v4(),
+        title: title,
+        assignee: 'Maya Chen',
+        category: 'Follow-up',
+        priority: PriorityLevel.medium,
+        status: TaskStatus.todo,
+        dueAt: DateTime.now().add(const Duration(days: 1)),
+        isRecurring: false,
+      ),
+    );
+  }
+}
+
+final meetingsControllerProvider = AsyncNotifierProvider<MeetingsController, List<Meeting>>(
+  MeetingsController.new,
+);
+
+final meetingsProvider = meetingsControllerProvider;
+
+class MeetingsController extends AsyncNotifier<List<Meeting>> {
+  @override
+  Future<List<Meeting>> build() => ref.watch(crmUseCasesProvider).meetings();
+
+  Future<void> saveMeeting(Meeting meeting) async {
+    await ref.read(crmUseCasesProvider).upsertMeeting(meeting);
+    ref.invalidate(dashboardProvider);
+    ref.invalidate(activitiesProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteMeeting(String id) async {
+    await ref.read(crmUseCasesProvider).removeMeeting(id);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createDemoMeeting(String title, String customerName) {
+    return saveMeeting(
+      Meeting(
+        id: const Uuid().v4(),
+        title: title,
+        customerName: customerName,
+        startsAt: DateTime.now().add(const Duration(days: 1, hours: 2)),
+        durationMinutes: 45,
+        videoLink: 'https://meet.example.com/${const Uuid().v4()}',
+        notes: 'Created from mobile CRM.',
+      ),
+    );
+  }
+}
+
+final activitiesControllerProvider = AsyncNotifierProvider<ActivitiesController, List<ActivityItem>>(
+  ActivitiesController.new,
+);
+
+final activitiesProvider = activitiesControllerProvider;
+
+class ActivitiesController extends AsyncNotifier<List<ActivityItem>> {
+  @override
+  Future<List<ActivityItem>> build() => ref.watch(crmUseCasesProvider).activities();
+
+  Future<void> saveActivity(ActivityItem activity) async {
+    await ref.read(crmUseCasesProvider).upsertActivity(activity);
+    ref.invalidate(dashboardProvider);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteActivity(String id) async {
+    await ref.read(crmUseCasesProvider).removeActivity(id);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createLog(ActivityType type, String title, String description) {
+    return saveActivity(
+      ActivityItem(
+        id: const Uuid().v4(),
+        type: type,
+        title: title,
+        description: description,
+        actor: 'Maya Chen',
+        occurredAt: DateTime.now(),
+      ),
+    );
+  }
+}
+
+final notificationsControllerProvider = AsyncNotifierProvider<NotificationsController, List<CrmNotification>>(
+  NotificationsController.new,
+);
+
+final notificationsProvider = notificationsControllerProvider;
+
+class NotificationsController extends AsyncNotifier<List<CrmNotification>> {
+  @override
+  Future<List<CrmNotification>> build() => ref.watch(crmUseCasesProvider).notifications();
+
+  Future<void> saveNotification(CrmNotification notification) async {
+    await ref.read(crmUseCasesProvider).upsertNotification(notification);
+    ref.invalidateSelf();
+  }
+
+  Future<void> markRead(String id, bool isRead) async {
+    await ref.read(crmUseCasesProvider).markNotificationRead(id, isRead);
+    ref.invalidateSelf();
+  }
+
+  Future<void> deleteNotification(String id) async {
+    await ref.read(crmUseCasesProvider).removeNotification(id);
+    ref.invalidateSelf();
+  }
+
+  Future<void> createReminder(String title, String body) {
+    return saveNotification(
+      CrmNotification(
+        id: const Uuid().v4(),
+        title: title,
+        body: body,
+        createdAt: DateTime.now(),
+        isRead: false,
+      ),
+    );
+  }
+}
+
+final communicationsControllerProvider = AsyncNotifierProvider<CommunicationsController, List<CommunicationRecord>>(
+  CommunicationsController.new,
+);
+
+class CommunicationsController extends AsyncNotifier<List<CommunicationRecord>> {
+  @override
+  Future<List<CommunicationRecord>> build() => ref.watch(crmUseCasesProvider).communications();
+
+  Future<void> createCommunication(CommunicationChannel channel, String recipient, String subject, String message) async {
+    await ref.read(crmUseCasesProvider).upsertCommunication(
+          CommunicationRecord(
+            id: const Uuid().v4(),
+            channel: channel,
+            recipient: recipient,
+            subject: subject,
+            message: message,
+            createdAt: DateTime.now(),
+            status: 'Queued locally',
+          ),
+        );
+    ref.invalidate(activitiesProvider);
+    ref.invalidate(notificationsProvider);
+    ref.invalidateSelf();
+  }
+}
+
+final exportsControllerProvider = AsyncNotifierProvider<ExportsController, List<ExportRecord>>(
+  ExportsController.new,
+);
+
+class ExportsController extends AsyncNotifier<List<ExportRecord>> {
+  @override
+  Future<List<ExportRecord>> build() => ref.watch(crmUseCasesProvider).exports();
+
+  Future<void> generateExport(String reportName, ExportFormat format) async {
+    final extension = format == ExportFormat.pdf ? 'pdf' : 'xlsx';
+    await ref.read(crmUseCasesProvider).upsertExport(
+          ExportRecord(
+            id: const Uuid().v4(),
+            reportName: reportName,
+            format: format,
+            path: 'local_exports/${reportName.toLowerCase().replaceAll(' ', '_')}.$extension',
+            createdAt: DateTime.now(),
+          ),
+        );
+    ref.invalidate(activitiesProvider);
+    ref.invalidateSelf();
+  }
+}

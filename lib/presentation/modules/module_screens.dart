@@ -60,6 +60,36 @@ class TasksMeetingsScreen extends ConsumerWidget {
       subtitle: 'Status tracking, recurring tasks, calendar, and reminders',
       child: Column(
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () async {
+                    final title = await _promptText(context, 'Create task', 'Task title');
+                    if (title != null && title.trim().isNotEmpty) {
+                      await ref.read(tasksControllerProvider.notifier).createDemoTask(title.trim());
+                    }
+                  },
+                  icon: const Icon(Icons.add_task_rounded),
+                  label: const Text('Add task'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () async {
+                    final title = await _promptText(context, 'Schedule meeting', 'Meeting title');
+                    if (title != null && title.trim().isNotEmpty) {
+                      await ref.read(meetingsControllerProvider.notifier).createDemoMeeting(title.trim(), 'Customer');
+                    }
+                  },
+                  icon: const Icon(Icons.video_call_rounded),
+                  label: const Text('Add meeting'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
           tasks.when(
             loading: () => const LoadingSkeleton(rows: 2),
             error: (error, stackTrace) => EmptyState(title: 'Tasks unavailable', message: '$error'),
@@ -86,23 +116,46 @@ class ActivitiesScreen extends ConsumerWidget {
     return _ModulePage(
       title: 'Activity timeline',
       subtitle: 'Customer interactions across calls, email, meetings, and notes',
-      child: activities.when(
-        loading: () => const LoadingSkeleton(rows: 4),
-        error: (error, stackTrace) => EmptyState(title: 'Activities unavailable', message: '$error'),
-        data: (items) => GlassPanel(
-          child: Column(
-            children: [
-              for (final activity in items)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.bubble_chart_rounded),
-                  title: Text(activity.title, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text('${activity.description}\n${activity.actor}'),
-                  isThreeLine: true,
-                ),
-            ],
+      child: Column(
+        children: [
+          FilledButton.icon(
+            onPressed: () async {
+              final title = await _promptText(context, 'Create activity', 'Activity title');
+              if (title != null && title.trim().isNotEmpty) {
+                await ref.read(activitiesControllerProvider.notifier).createLog(
+                      ActivityType.note,
+                      title.trim(),
+                      'Manual activity logged from mobile CRM.',
+                    );
+              }
+            },
+            icon: const Icon(Icons.add_comment_rounded),
+            label: const Text('Log activity'),
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          activities.when(
+            loading: () => const LoadingSkeleton(rows: 4),
+            error: (error, stackTrace) => EmptyState(title: 'Activities unavailable', message: '$error'),
+            data: (items) => GlassPanel(
+              child: Column(
+                children: [
+                  for (final activity in items)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.bubble_chart_rounded),
+                      title: Text(activity.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      subtitle: Text('${activity.description}\n${activity.actor}'),
+                      trailing: IconButton(
+                        onPressed: () => ref.read(activitiesControllerProvider.notifier).deleteActivity(activity.id),
+                        icon: const Icon(Icons.delete_outline_rounded),
+                      ),
+                      isThreeLine: true,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -113,11 +166,12 @@ class CommunicationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final communications = ref.watch(communicationsControllerProvider);
     final actions = [
-      ('Email campaign', Icons.mail_rounded, 'Send personalized templates to a lead segment.'),
-      ('SMS reminder', Icons.sms_rounded, 'Deliver follow-up reminders and task nudges.'),
-      ('WhatsApp outreach', Icons.chat_rounded, 'Continue high-context customer conversations.'),
-      ('Bulk messaging', Icons.campaign_rounded, 'Queue compliant updates for selected customers.'),
+      ('Email campaign', Icons.mail_rounded, CommunicationChannel.email, 'Send personalized templates to a lead segment.'),
+      ('SMS reminder', Icons.sms_rounded, CommunicationChannel.sms, 'Deliver follow-up reminders and task nudges.'),
+      ('WhatsApp outreach', Icons.chat_rounded, CommunicationChannel.whatsapp, 'Continue high-context customer conversations.'),
+      ('Bulk messaging', Icons.campaign_rounded, CommunicationChannel.bulk, 'Queue compliant updates for selected customers.'),
     ];
     return _ModulePage(
       title: 'Communication',
@@ -132,11 +186,46 @@ class CommunicationScreen extends ConsumerWidget {
                   contentPadding: EdgeInsets.zero,
                   leading: CircleAvatar(child: Icon(action.$2)),
                   title: Text(action.$1, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text(action.$3),
-                  trailing: FilledButton.tonal(onPressed: () {}, child: const Text('Use')),
+                  subtitle: Text(action.$4),
+                  trailing: FilledButton.tonal(
+                    onPressed: () async {
+                      await ref.read(communicationsControllerProvider.notifier).createCommunication(
+                            action.$3,
+                            action.$3 == CommunicationChannel.bulk ? 'Selected segment' : 'customer@example.com',
+                            action.$1,
+                            action.$4,
+                          );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${action.$1} queued locally')),
+                        );
+                      }
+                    },
+                    child: const Text('Use'),
+                  ),
                 ),
               ),
             ),
+          const SizedBox(height: AppSpacing.lg),
+          communications.when(
+            loading: () => const LoadingSkeleton(rows: 2),
+            error: (error, stackTrace) => EmptyState(title: 'Communication history unavailable', message: '$error'),
+            data: (records) => GlassPanel(
+              child: Column(
+                children: [
+                  const SectionHeader(title: 'Queued history', subtitle: 'Local communication records'),
+                  const SizedBox(height: AppSpacing.sm),
+                  for (final record in records)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.mark_email_read_rounded),
+                      title: Text(record.subject, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      subtitle: Text('${record.channel.label} • ${record.recipient} • ${record.status}'),
+                    ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -149,6 +238,7 @@ class ReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(dashboardProvider);
+    final exports = ref.watch(exportsControllerProvider);
     return _ModulePage(
       title: 'Reports & analytics',
       subtitle: 'Revenue, conversion, sales performance, and exports',
@@ -168,12 +258,43 @@ class ReportsScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
-                      Expanded(child: OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf_rounded), label: const Text('Export PDF'))),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => ref.read(exportsControllerProvider.notifier).generateExport('Revenue Report', ExportFormat.pdf),
+                          icon: const Icon(Icons.picture_as_pdf_rounded),
+                          label: const Text('Export PDF'),
+                        ),
+                      ),
                       const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.table_chart_rounded), label: const Text('Export Excel'))),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => ref.read(exportsControllerProvider.notifier).generateExport('Revenue Report', ExportFormat.excel),
+                          icon: const Icon(Icons.table_chart_rounded),
+                          label: const Text('Export Excel'),
+                        ),
+                      ),
                     ],
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            exports.when(
+              loading: () => const LoadingSkeleton(rows: 1),
+              error: (error, stackTrace) => EmptyState(title: 'Export history unavailable', message: '$error'),
+              data: (records) => GlassPanel(
+                child: Column(
+                  children: [
+                    const SectionHeader(title: 'Export history', subtitle: 'Generated local report records'),
+                    for (final record in records)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(record.format == ExportFormat.pdf ? Icons.picture_as_pdf_rounded : Icons.table_chart_rounded),
+                        title: Text(record.reportName, style: const TextStyle(fontWeight: FontWeight.w900)),
+                        subtitle: Text(record.path),
+                      ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -192,22 +313,52 @@ class NotificationsScreen extends ConsumerWidget {
     return _ModulePage(
       title: 'Notifications',
       subtitle: 'Push, in-app reminders, task alerts, and meeting nudges',
-      child: notifications.when(
-        loading: () => const LoadingSkeleton(rows: 3),
-        error: (error, stackTrace) => EmptyState(title: 'Notifications unavailable', message: '$error'),
-        data: (items) => GlassPanel(
-          child: Column(
-            children: [
-              for (final item in items)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(item.isRead ? Icons.notifications_none_rounded : Icons.notifications_active_rounded),
-                  title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  subtitle: Text(item.body),
-                ),
-            ],
+      child: Column(
+        children: [
+          FilledButton.icon(
+            onPressed: () async {
+              final title = await _promptText(context, 'Create reminder', 'Reminder title');
+              if (title != null && title.trim().isNotEmpty) {
+                await ref.read(notificationsControllerProvider.notifier).createReminder(
+                      title.trim(),
+                      'Manual reminder created from notification center.',
+                    );
+              }
+            },
+            icon: const Icon(Icons.add_alert_rounded),
+            label: const Text('Create reminder'),
           ),
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          notifications.when(
+            loading: () => const LoadingSkeleton(rows: 3),
+            error: (error, stackTrace) => EmptyState(title: 'Notifications unavailable', message: '$error'),
+            data: (items) => GlassPanel(
+              child: Column(
+                children: [
+                  for (final item in items)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(item.isRead ? Icons.notifications_none_rounded : Icons.notifications_active_rounded),
+                      title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                      subtitle: Text(item.body),
+                      trailing: Wrap(
+                        children: [
+                          IconButton(
+                            onPressed: () => ref.read(notificationsControllerProvider.notifier).markRead(item.id, !item.isRead),
+                            icon: Icon(item.isRead ? Icons.mark_email_unread_rounded : Icons.mark_email_read_rounded),
+                          ),
+                          IconButton(
+                            onPressed: () => ref.read(notificationsControllerProvider.notifier).deleteNotification(item.id),
+                            icon: const Icon(Icons.delete_outline_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -260,11 +411,11 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class AdminScreen extends StatelessWidget {
+class AdminScreen extends ConsumerWidget {
   const AdminScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final items = [
       ('User management', 'Invite, deactivate, and audit users', Icons.manage_accounts_rounded),
       ('Team management', 'Territories, sales pods, and capacity', Icons.groups_2_rounded),
@@ -287,6 +438,17 @@ class AdminScreen extends StatelessWidget {
                   title: Text(item.$1, style: const TextStyle(fontWeight: FontWeight.w900)),
                   subtitle: Text(item.$2),
                   trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () async {
+                    await ref.read(notificationsControllerProvider.notifier).createReminder(
+                          '${item.$1} updated',
+                          '${item.$2} was saved locally for admin review.',
+                        );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('${item.$1} action saved locally')),
+                      );
+                    }
+                  },
                 ),
               ),
             ),
@@ -325,13 +487,13 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _TaskList extends StatelessWidget {
+class _TaskList extends ConsumerWidget {
   const _TaskList({required this.tasks});
 
   final List<TaskItem> tasks;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final formatter = DateFormat.MMMd().add_jm();
     return GlassPanel(
       child: Column(
@@ -341,10 +503,21 @@ class _TaskList extends StatelessWidget {
           for (final task in tasks)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.task_rounded, color: priorityColor(task.priority)),
+              leading: Checkbox(
+                value: task.status == TaskStatus.done,
+                onChanged: (_) => ref.read(tasksControllerProvider.notifier).toggleDone(task),
+              ),
               title: Text(task.title, style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text('${task.assignee} • ${task.category} • ${formatter.format(task.dueAt)}'),
-              trailing: StatusBadge(label: task.status.label, color: priorityColor(task.priority)),
+              trailing: Wrap(
+                children: [
+                  StatusBadge(label: task.status.label, color: priorityColor(task.priority)),
+                  IconButton(
+                    onPressed: () => ref.read(tasksControllerProvider.notifier).deleteTask(task.id),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
+              ),
             ),
         ],
       ),
@@ -352,13 +525,13 @@ class _TaskList extends StatelessWidget {
   }
 }
 
-class _MeetingList extends StatelessWidget {
+class _MeetingList extends ConsumerWidget {
   const _MeetingList({required this.meetings});
 
   final List<Meeting> meetings;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final formatter = DateFormat.MMMd().add_jm();
     return GlassPanel(
       child: Column(
@@ -371,6 +544,10 @@ class _MeetingList extends StatelessWidget {
               leading: const Icon(Icons.video_camera_front_rounded),
               title: Text(meeting.title, style: const TextStyle(fontWeight: FontWeight.w900)),
               subtitle: Text('${meeting.customerName} • ${formatter.format(meeting.startsAt)}\n${meeting.videoLink}'),
+              trailing: IconButton(
+                onPressed: () => ref.read(meetingsControllerProvider.notifier).deleteMeeting(meeting.id),
+                icon: const Icon(Icons.delete_outline_rounded),
+              ),
               isThreeLine: true,
             ),
         ],
@@ -433,4 +610,19 @@ class _MoreItem {
   final String subtitle;
   final IconData icon;
   final String path;
+}
+
+Future<String?> _promptText(BuildContext context, String title, String label) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(title),
+      content: TextField(controller: controller, autofocus: true, decoration: InputDecoration(labelText: label)),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Save')),
+      ],
+    ),
+  );
 }
